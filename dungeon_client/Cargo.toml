@@ -1,0 +1,36 @@
+[package]
+name = "questionnaire_nsi"
+version = "0.1.0"
+authors = ["Mubelotix <unbeliever.in.time@gmail.com>"]
+edition = "2018"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+js-sys = "0.3.32"
+console_error_panic_hook = "0.1.6"
+serde = "1.0.103"
+serde_derive = "1.0.103"
+wasm_game_lib = { path="../../wasm_game_lib" }
+protocol = { path="../protocol" }
+
+[dependencies.wasm-bindgen]
+version = "0.2.55"
+features = ["serde-serialize"]
+
+[dependencies.web-sys]
+version = "0.3.32"
+features = [
+  'WebSocket',
+  'Document',
+  'Element',
+  'HtmlElement',
+  'Node',
+  'Window',
+  'console',
+  'Event',
+  'EventTarget',
+  'MessageEvent',
+  'Blob',
+]

@@ -1,0 +1,9 @@
+[package]
+name = "dungeon_server"
+version = "0.1.0"
+authors = ["Mubelotix <unbeliever.in.time@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+websocket = "0.24.0"
+protocol = { path = "../protocol" }

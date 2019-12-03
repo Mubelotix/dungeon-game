@@ -1,0 +1,7 @@
+[workspace]
+
+members = [
+    "dungeon_client",
+    "dungeon_server",
+    "protocol"
+]
