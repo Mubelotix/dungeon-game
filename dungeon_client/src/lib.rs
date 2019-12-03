@@ -4,6 +4,8 @@ use protocol::*;
 use web_sys::{WebSocket, Event, MessageEvent};
 use std::rc::Rc;
 use std::sync::mpsc::channel;
+use std::panic;
+use console_error_panic_hook;
 
 #[wasm_bindgen]
 extern "C" {
@@ -28,30 +30,41 @@ macro_rules! println {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
 
-fn main(images: &Vec<Image>, websocket: &WebSocket) {
-    let mut canvas = Canvas::new();
-
-    let (tx, rx) = channel::<Vec<u8>>();
+fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
+    // configure the websocket
+    let (tx, rx) = channel::<Message>();
     let message = Closure::wrap(Box::new(move |event: MessageEvent| {
-        
-        println!("{:?}", Message::from_string(event.data().as_string().unwrap()));
-        /*if let blob = event.data().into() {
-            println!("{:?}", blob);
+        if let Some(data) = event.data().as_string() {
+            match Message::decode(data) {
+                Ok(message) => if let Err(error) = tx.send(message) {
+                    panic!("error while using transmitter: {}", error);
+                },
+                Err(error) => println!("error decoding data: {}", error),
+            };
         } else {
-            println!("invalid message: {:?} because {:?}", event.data(), Blob::new_with_str_sequence(&event.data()));
-        }*/
-        
-        
+            println!("can't read message as string");
+        }
     }) as Box<dyn FnMut(MessageEvent)>);
     websocket
         .add_event_listener_with_callback("message", message.as_ref().unchecked_ref())
         .unwrap();
     message.forget();
 
+    println!("Game is ready!");
+    let mut canvas = Canvas::new();
     let main_loop = Closure::wrap(Box::new(move || {
-        canvas.clear();
+        while let Ok(message) = rx.try_recv() {
+            match message {
+                Message::Connect(_) => {
+                    if let Err(error) = websocket.send_with_str(&Message::Connect(String::from("test_user")).encode()) {
+                        println!("there was an error while trying to connect: {:?}", error);
+                    }
+                },
+            };
+            println!("received message: {:?}", message);
+        }
 
-        
+        canvas.clear();
     }) as Box<dyn FnMut()>);
 
     window()
@@ -64,33 +77,25 @@ fn main(images: &Vec<Image>, websocket: &WebSocket) {
 }
 
 fn setup_websocket(images: Vec<Image>) {
-    println!("Textures loaded");
-
-    
-
-    println!("connecting");
+    println!("Connecting...");
     let websocket = Rc::new(WebSocket::new_with_str("ws://localhost:2794", "dungeon_game_protocol").unwrap());
 
+    // TODO clear this shit
     let websocket2 = Rc::clone(&websocket);
     let open = Closure::wrap(Box::new(move |_event: Event| {
-        println!("opened");
-        websocket2.send_with_str("test!").unwrap();
-        main(&images, &websocket2);
+        let images: Vec<Image> = (&images).clone();
+        let websocket = Rc::clone(&websocket2);
+        main(images, websocket);
     }) as Box<dyn FnMut(Event)>);
     websocket
         .add_event_listener_with_callback("open", open.as_ref().unchecked_ref())
         .unwrap();
     open.forget();
-
-    
-
-    
 }
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
-    println!("Program started!");
-
+    panic::set_hook(Box::new(console_error_panic_hook::hook));
     println!("Loading textures...");
     Image::load_images(vec!["https://mubelotix.dev/game/dirt.png"], setup_websocket);
 

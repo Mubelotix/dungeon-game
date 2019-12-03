@@ -1,3 +1,5 @@
+#![warn(clippy::all)]
+
 #[repr(u8)]
 #[derive(Clone, Copy, Debug)]
 pub enum OpCode {
@@ -10,7 +12,7 @@ pub enum Message {
 }
 
 impl Message {
-	pub fn from_string(data: String) -> Result<Self, &'static str> {
+	pub fn decode(data: String) -> Result<Self, &'static str> {
 		match data.as_bytes()[0] {
 			1 => {
                 if let Ok(username) = String::from_utf8(data.as_bytes()[1..].to_vec()) {
@@ -25,7 +27,7 @@ impl Message {
 		}
 	}
 
-	pub fn to_string(&self) -> String {
+	pub fn encode(&self) -> String {
 		match self {
 			Message::Connect(username) => {
 				let mut data = vec![OpCode::Connect as u8];
@@ -46,13 +48,13 @@ mod tests {
     #[test]
     fn connect() {
         let msg_original = Message::Connect(String::from("jean miche muche"));
-        let msg_serialized = msg_original.to_string();
-        let msg_deserialized = Message::from_string(msg_serialized).unwrap();
+        let msg_serialized = msg_original.encode();
+        let msg_deserialized = Message::decode(msg_serialized).unwrap();
         assert_eq!(msg_original, msg_deserialized);
 
         let msg_original = Message::Connect(String::new());
-        let msg_serialized = msg_original.to_string();
-        let msg_deserialized = Message::from_string(msg_serialized).unwrap();
+        let msg_serialized = msg_original.encode();
+        let msg_deserialized = Message::decode(msg_serialized).unwrap();
         assert_eq!(msg_original, msg_deserialized);
     }
 }

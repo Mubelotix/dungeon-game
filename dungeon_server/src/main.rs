@@ -17,7 +17,7 @@ fn main() {
 			println!("Connection from {}", ip);
 
 			// ask the client a username
-			let message: OwnedMessage = OwnedMessage::Text(Message::Connect(String::new()).to_string());
+			let message: OwnedMessage = OwnedMessage::Text(Message::Connect(String::new()).encode());
 			client.send_message(&message).unwrap();
 
 			let (mut receiver, mut sender) = client.split().unwrap();
@@ -36,10 +36,12 @@ fn main() {
 						let message = OwnedMessage::Pong(ping);
 						sender.send_message(&message).unwrap();
 					}
-					_ => {
-						sender.send_message(&message).unwrap();
-						println!("message from client: {:?}", message);
+					OwnedMessage::Text(data) => {
+						println!("message from client: {:?}", Message::decode(data));
 					},
+					_ => {
+						println!("unknwon message format");
+					}
 				}
 			}
 		});
