@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use std::thread;
 use websocket::sync::Server;
 use websocket::OwnedMessage;
@@ -40,7 +41,6 @@ fn main() {
 					}
 					OwnedMessage::Text(data) => {
 						println!("message from client: {:?}", Message::decode(data));
-						sender.send_message(&OwnedMessage::Text(Message::ChatMessage(String::from("SERVER"), String::from("you"), String::from("this is a chat message")).encode())).unwrap();
 					},
 					_ => {
 						println!("unknwon message format");

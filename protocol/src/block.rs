@@ -1,11 +1,13 @@
+use serde::{Serialize, Deserialize};
+
 #[repr(u16)]
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum BlockCode {
     SimpleSlab = 1,
     SimpleWall,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub enum Orientation {
     Up = 1,
     Down,
@@ -13,7 +15,7 @@ pub enum Orientation {
     Right
 }
 
-#[derive(Clone, Copy, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Block {
     block_code: BlockCode,
     orientation: Orientation
@@ -44,7 +46,7 @@ impl Block {
     }
 }
 
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]
 pub struct Chunk {
     pub x: u64,
     pub y: u64,

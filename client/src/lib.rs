@@ -61,12 +61,15 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                     }
                     println!("You are now connected!");
                 },
-                Message::ChatMessage(from, to, message) => {
-                    println!("{} -> {}: {}", from, to, message);
+                Message::ChatMessage(message) => {
+                    //println!("{} -> {}: {}", message.message, to, message);
                 },
                 Message::Chunk(_chunk) => {
                     println!("received a chunk");
-                }
+                },
+                Message::CreateEntity(entity) => {
+
+                },
             };
         }
 
