@@ -1,5 +1,5 @@
 use std::mem::transmute;
-use crate::block::{Block, BlockCode, Orientation};
+use crate::block::{Block, BlockCode, Orientation, Chunk};
 
 fn u64_to_8_u8(x: u64) -> [u8;8] {
     unsafe { transmute(x.to_be()) }
@@ -21,7 +21,7 @@ pub enum OpCode {
 pub enum Message {
     Connect(String),
     ChatMessage(String, String, String),
-    Chunk(u64, u64, [[Block;8];8])
+    Chunk(Chunk)
 }
 
 impl Message {
@@ -82,7 +82,7 @@ impl Message {
                         blocks[i][j] = Block::new(block_code, orientation);
                     }
                 }
-                Ok(Message::Chunk(x, y, blocks))
+                Ok(Message::Chunk(Chunk::new(x, y, blocks)))
             }
 			i => {
                 panic!("invalid opcode {}", i);
@@ -114,15 +114,15 @@ impl Message {
 					String::from_utf8_unchecked(data)
 				}
             },
-            Message::Chunk(x, y, blocks) => {
+            Message::Chunk(chunk) => {
                 let mut data = vec![OpCode::Chunk as u8];
-                data.append(&mut u64_to_8_u8(*x).to_vec());
-                data.append(&mut u64_to_8_u8(*y).to_vec());
+                data.append(&mut u64_to_8_u8(chunk.x).to_vec());
+                data.append(&mut u64_to_8_u8(chunk.y).to_vec());
                 for i in 0..8 {
                     for j in 0..8 {
-                        println!("b: {:?}", u16_to_2_u8(blocks[i][j].get_block_code() as u16));
-                        data.append(&mut u16_to_2_u8(blocks[i][j].get_block_code() as u16).to_vec());
-                        data.push(blocks[i][j].get_orientation() as u8);
+                        println!("b: {:?}", u16_to_2_u8(chunk.blocks[i][j].get_block_code() as u16));
+                        data.append(&mut u16_to_2_u8(chunk.blocks[i][j].get_block_code() as u16).to_vec());
+                        data.push(chunk.blocks[i][j].get_orientation() as u8);
                     }
                 }
 

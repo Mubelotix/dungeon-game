@@ -64,7 +64,7 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::ChatMessage(from, to, message) => {
                     println!("{} -> {}: {}", from, to, message);
                 },
-                Message::Chunk(x, y, blocks) => {
+                Message::Chunk(_chunk) => {
                     println!("received a chunk");
                 }
             };

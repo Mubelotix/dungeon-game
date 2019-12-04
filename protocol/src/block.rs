@@ -44,6 +44,29 @@ impl Block {
     }
 }
 
+#[derive(Debug, PartialEq, Clone, Copy)]
+pub struct Chunk {
+    pub x: u64,
+    pub y: u64,
+    pub blocks: [[Block;8];8]
+}
+
+impl Default for Chunk {
+    fn default() -> Self {
+        Self::new(9_223_372_036_854_775_808, 9_223_372_036_854_775_808, [[Block::default();8];8])
+    }
+}
+
+impl Chunk {
+    pub fn new(x: u64, y: u64, blocks: [[Block;8];8]) -> Self {
+        Self {
+            x,
+            y,
+            blocks
+        }
+    }
+}
+
 impl Default for Block {
     fn default() -> Self {
         Self {

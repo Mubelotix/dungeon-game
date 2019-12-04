@@ -2,6 +2,8 @@ use std::thread;
 use websocket::sync::Server;
 use websocket::OwnedMessage;
 use protocol::message::Message;
+mod map;
+use crate::map::*;
 
 fn main() {
 	let server = Server::bind("localhost:2794").unwrap();
@@ -48,3 +50,4 @@ fn main() {
 		});
 	}
 }
+
