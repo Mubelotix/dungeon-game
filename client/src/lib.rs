@@ -1,6 +1,6 @@
 use wasm_game_lib::{graphics::canvas::*, graphics::image::*, graphics::sprite::*, system::util::*, events::*};
 use wasm_bindgen::{prelude::*, JsCast};
-use protocol::*;
+use protocol::message::Message;
 use web_sys::{WebSocket, Event, MessageEvent};
 use std::rc::Rc;
 use std::sync::mpsc::channel;
@@ -39,7 +39,7 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Ok(message) => if let Err(error) = tx.send(message) {
                     panic!("error while using transmitter: {}", error);
                 },
-                Err(error) => println!("error decoding data: {}", error),
+                Err(error) => println!("error decoding message: {}", error),
             };
         } else {
             println!("can't read message as string");
@@ -59,9 +59,15 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                     if let Err(error) = websocket.send_with_str(&Message::Connect(String::from("test_user")).encode()) {
                         println!("there was an error while trying to connect: {:?}", error);
                     }
+                    println!("You are now connected!");
                 },
+                Message::ChatMessage(from, to, message) => {
+                    println!("{} -> {}: {}", from, to, message);
+                },
+                Message::Chunk(x, y, blocks) => {
+                    println!("received a chunk");
+                }
             };
-            println!("received message: {:?}", message);
         }
 
         canvas.clear();

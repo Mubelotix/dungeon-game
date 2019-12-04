@@ -1,5 +1,5 @@
 [package]
-name = "dungeon_server"
+name = "server"
 version = "0.1.0"
 authors = ["Mubelotix <unbeliever.in.time@gmail.com>"]
 edition = "2018"

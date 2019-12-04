@@ -1,7 +1,7 @@
 use std::thread;
 use websocket::sync::Server;
 use websocket::OwnedMessage;
-use protocol::*;
+use protocol::message::Message;
 
 fn main() {
 	let server = Server::bind("localhost:2794").unwrap();
@@ -38,6 +38,7 @@ fn main() {
 					}
 					OwnedMessage::Text(data) => {
 						println!("message from client: {:?}", Message::decode(data));
+						sender.send_message(&OwnedMessage::Text(Message::ChatMessage(String::from("SERVER"), String::from("you"), String::from("this is a chat message")).encode())).unwrap();
 					},
 					_ => {
 						println!("unknwon message format");
