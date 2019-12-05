@@ -1,18 +1,6 @@
 use protocol::message::Message;
 use protocol::block::{Block, BlockCode, Orientation, Chunk};
-
-#[test]
-    fn connect() {
-        let msg_original = Message::Connect(String::from("jean miche muche"));
-        let msg_serialized = msg_original.encode();
-        let msg_deserialized = Message::decode(msg_serialized).unwrap();
-        assert_eq!(msg_original, msg_deserialized);
-
-        let msg_original = Message::Connect(String::new());
-        let msg_serialized = msg_original.encode();
-        let msg_deserialized = Message::decode(msg_serialized).unwrap();
-        assert_eq!(msg_original, msg_deserialized);
-    }
+use protocol::entity::*;
 
     #[test]
     fn chunk() {
@@ -30,3 +18,12 @@ use protocol::block::{Block, BlockCode, Orientation, Chunk};
         let msg_deserialized = Message::decode(msg_serialized).unwrap();
         assert_eq!(msg_original, msg_deserialized);
     }
+
+#[test]
+fn test() {
+    let msg_original = Message::CreateEntity(Entity::new(9_223_372_036_854_775_808, 0, 0, String::new(), EntityType::You));
+    let msg_serialized = msg_original.encode();
+    println!("{:?}", msg_serialized);
+    let msg_deserialized = Message::decode(msg_serialized).unwrap();
+    assert_eq!(msg_original, msg_deserialized);
+}

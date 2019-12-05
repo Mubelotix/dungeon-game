@@ -1,7 +1,7 @@
 use std::ops::{Index, IndexMut};
 use protocol::block::{Block, Chunk};
 
-struct Map {
+pub struct Map {
     chunks: Vec<Chunk>,
     default_block: Block,
 }

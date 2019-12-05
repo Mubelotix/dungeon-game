@@ -33,4 +33,5 @@ features = [
   'EventTarget',
   'MessageEvent',
   'Blob',
+  'BinaryType'
 ]
