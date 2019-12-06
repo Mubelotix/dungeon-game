@@ -30,7 +30,7 @@ impl Map {
             }
             idx += 1;
         }
-        Chunk::default()
+        Chunk::new(x, y, [[Block::default();8];8])
     }
 
     pub fn set_chunk(&mut self, x: u64, y: u64, blocks: [[Block;8];8]) {
