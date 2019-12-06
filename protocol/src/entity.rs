@@ -8,7 +8,7 @@ pub enum EntityType {
     Ennemy
 }
 
-#[derive(Debug, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
 pub struct Entity {
     x: u64,
     y: u64,
@@ -39,6 +39,14 @@ impl Entity {
             name,
             entity_type: EntityType::You
         }
+    }
+
+    pub fn set_entity_name(&mut self, name: String) {
+        self.name = name;
+    }
+
+    pub fn get_name(&self) -> &String {
+        &self.name
     }
 
     pub fn get_entity_type(&self) -> EntityType {
