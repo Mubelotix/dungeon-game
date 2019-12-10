@@ -44,6 +44,13 @@ impl Block {
     pub fn set_orientation(&mut self, orientation: Orientation) {
         self.orientation = orientation;
     }
+
+    pub fn is_solid(self) -> bool {
+        match self.block_code {
+            BlockCode::SimpleSlab => false,
+            BlockCode::SimpleWall => true,
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Clone, Copy, Serialize, Deserialize)]

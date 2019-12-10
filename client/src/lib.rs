@@ -32,7 +32,7 @@ macro_rules! println {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
 
-fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
+fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
     println!("Game is ready!");
 
     let mut canvas = Canvas::new();
@@ -40,6 +40,11 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
     let mut player: Option<Entity> = None;
     let mut chunks: Vec<Chunk> = Vec::new();
     let websocket2 = Rc::clone(&websocket);
+    
+    for image in &mut images {
+        image.set_origin((0.0, image.get_size().1 as f64));
+    }
+    images[2].set_origin((0.0, 0.0));
 
     websocket.send_with_str(&Message::Init{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
     let message = Closure::wrap(Box::new(move |event: MessageEvent| {
@@ -59,16 +64,16 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::Tick => {
                     if let Some(player) = &mut player {
                         if keyboard.get_key(Key::Q) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Left}.encode()).unwrap();
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Left}.encode()).unwrap();
                             player.move_in_direction(Orientation::Left);
                         } else if keyboard.get_key(Key::D) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Right}.encode()).unwrap();
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Right}.encode()).unwrap();
                             player.move_in_direction(Orientation::Right);
                         } else if keyboard.get_key(Key::Z) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Up}.encode()).unwrap();
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Up}.encode()).unwrap();
                             player.move_in_direction(Orientation::Up);
                         } else if keyboard.get_key(Key::S) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Down}.encode()).unwrap();
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Down}.encode()).unwrap();
                             player.move_in_direction(Orientation::Down);
                         }
                         
@@ -83,10 +88,10 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                                 for j in 0..8 {
                                     match chunk.blocks[i][j].get_block_code() {
                                         BlockCode::SimpleSlab => {
-                                            canvas.draw_image_with_size((x + i as isize * 40) as f64, (y + j as isize * 40) as f64, 40.0, 40.0, &images[0]);
+                                            canvas.draw_image((x + i as isize * 40) as f64, (y + j as isize * 40) as f64 + 80.0, &images[0]);
                                         },
                                         BlockCode::SimpleWall => {
-                                            canvas.draw_image_with_size((x + i as isize * 40) as f64, (y + j as isize * 40) as f64, 40.0, 40.0, &images[1])
+                                            canvas.draw_image((x + i as isize * 40) as f64, (y + j as isize * 40) as f64 + 80.0, &images[1])
                                         }
                                     }
                                 }
@@ -133,7 +138,10 @@ fn setup_websocket(images: Vec<Image>) {
 pub fn start() -> Result<(), JsValue> {
     panic::set_hook(Box::new(console_error_panic_hook::hook));
     println!("Loading textures...");
-    Image::load_images(vec!["https://cdnb.artstation.com/p/assets/images/images/001/146/571/large/ulrick-wery-tileableset2-groundslab.jpg?1441028618", "https://3docean.img.customer.envatousercontent.com/files/45172611/main1_590.JPG?auto=compress%2Cformat&fit=crop&crop=top&w=590&h=590&s=a4ea7fe36777345d561d83dc79e55874", "https://p7.hiclipart.com/preview/924/660/881/2d-computer-graphics-video-game-character-concept-art-2d-game-character-sprites.jpg"], setup_websocket);
+    Image::load_images(vec![
+        "https://mubelotix.dev/dungeon_game/textures/simple_slab.jpg",
+        "https://mubelotix.dev/dungeon_game/textures/simple_wall.jpg",
+        "https://mubelotix.dev/dungeon_game/textures/character.png"], setup_websocket);
 
     Ok(())
 }

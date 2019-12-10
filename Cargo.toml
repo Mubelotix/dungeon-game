@@ -3,5 +3,6 @@
 members = [
     "client",
     "server",
-    "protocol"
+    "protocol",
+    "wasm-game-lib"
 ]

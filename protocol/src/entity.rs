@@ -80,7 +80,7 @@ impl Entity {
     }
 
     pub fn get_speed(&self) -> u8 {
-        1
+        3
     }
 
     pub fn move_in_direction(&mut self, orientation: Orientation) {
@@ -120,6 +120,39 @@ impl Entity {
                 self.x2 = (self.x2 + in_block_lenght) % 40;
             }
         }
+    }
+
+    pub fn get_coords_after_eventual_move(&self, orientation: Orientation) -> (u64, u64) {
+        let in_block_lenght = self.get_speed() % 40;
+        let lenght = (self.get_speed() - in_block_lenght) / 40;
+        let (mut x, mut y) = (self.x, self.y);
+        match orientation {
+            Orientation::Up => {
+                y -= lenght as u64;
+                if self.y2 < in_block_lenght {
+                    y -= 1;
+                }
+            },
+            Orientation::Down => {
+                y += lenght as u64;
+                if self.y2 + in_block_lenght >= 40  {
+                    y += 1;
+                }
+            },
+            Orientation::Left => {
+                x -= lenght as u64;
+                if self.x2 < in_block_lenght {
+                    x -= 1;
+                }
+            },
+            Orientation::Right => {
+                x += lenght as u64;
+                if self.x2 + in_block_lenght >= 40  {
+                    x += 1;
+                }
+            }
+        };
+        (x, y)
     }
 }
 

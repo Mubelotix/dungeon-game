@@ -18,26 +18,36 @@ fn main() {
 	let server = Server::bind("localhost:2794").unwrap();
 	let map: Arc<Mutex<Map>> = Arc::new(Mutex::new(Map::new()));
 	let entities: Arc<Mutex<Vec<Arc<Mutex<Entity>>>>> = Arc::new(Mutex::new(Vec::new()));
-	
 
+	{
+		let mut map = map.lock().unwrap();
+		map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_808)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_807)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_806)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_805)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_807, 9_223_372_036_854_775_805)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_806, 9_223_372_036_854_775_805)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_805, 9_223_372_036_854_775_805)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		map[(9_223_372_036_854_775_804, 9_223_372_036_854_775_805)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+	}
+	
 	for request in server.filter_map(Result::ok) {
 		let map = Arc::clone(&map);
 		let entities = Arc::clone(&entities);
 
-		{
-			let mut map = map.lock().unwrap();
-			map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_808)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
-		}
-
 		thread::spawn(move || {
 			let client = request.use_protocol("dungeon_game_protocol").accept().unwrap();
-
 			let ip = client.peer_addr().unwrap();
-			
-			let mut chunk_left_top_coords: (u64, u64) = (9_223_372_036_854_775_808 - 3 * 8, 9_223_372_036_854_775_808 - 2 * 8);
+			let mut chunk_left_top_coords: (u64, u64) = (9_223_372_036_854_775_808 - 4 * 8, 9_223_372_036_854_775_808 - 2 * 8);
 			let player = Arc::new(Mutex::new(Entity::spawn_player("undefined".to_string())));
+			let player_id: u64 = {player.lock().unwrap().get_id()};
 
 			let (mut receiver, mut sender) = client.split().unwrap();
+
+			{
+				let mut entities = entities.lock().unwrap();
+				entities.push(Arc::clone(&player));
+			}
 
 			let (tx, rx) = channel::<OwnedMessage>();
 			thread::spawn(move || {
@@ -80,10 +90,21 @@ fn main() {
 									entities.lock().unwrap().push(player);
 
 									let map = map.lock().unwrap();
-									for i in 0..6 {
+									for i in 0..8 {
 										for j in 0..4 {
 											tx.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(chunk_left_top_coords.0 + i * 8, chunk_left_top_coords.1 + j * 8)).encode())).unwrap();
 										}
+									}
+								},
+								Message::MoveEntity{id, direction} => {
+									if id == player_id {
+										let map = map.lock().unwrap();
+										let mut player = player.lock().unwrap();
+										if map[player.get_coords_after_eventual_move(direction)].is_solid() {
+											player.move_in_direction(direction);
+										}
+									} else {
+										println!("attempt to move an unowned entity");
 									}
 								},
 								message => {

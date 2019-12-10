@@ -1,5 +1,5 @@
 use std::ops::{Index, IndexMut};
-use protocol::block::{Block, Chunk};
+use crate::block::{Block, Chunk};
 
 pub struct Map {
     chunks: Vec<Chunk>,
@@ -91,7 +91,7 @@ impl IndexMut<(u64, u64)> for Map {
 #[cfg(test)]
 mod tests {
     use super::Map;
-    use protocol::block::*;
+    use crate::block::*;
 	
 	#[test]
 	fn test() {

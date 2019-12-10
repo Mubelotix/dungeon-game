@@ -10,7 +10,7 @@ pub enum Message {
     CreateEntity(Entity),
     Init{username: String, screen_width: u32, screen_height: u32, password: Option<String>},
     Tick,
-    MoveEntity{id: u64, lenght: u8, direction: Orientation}
+    MoveEntity{id: u64, direction: Orientation}
 }
 
 impl Message {
