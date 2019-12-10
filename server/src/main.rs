@@ -8,17 +8,26 @@ mod map;
 use crate::map::*;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::rc::Rc;
-use std::cell::RefCell;
+use std::sync::mpsc::channel;
+use std::time::Duration;
+use protocol::block::Block;
+use protocol::block::BlockCode;
+use protocol::block::Orientation;
 
 fn main() {
 	let server = Server::bind("localhost:2794").unwrap();
 	let map: Arc<Mutex<Map>> = Arc::new(Mutex::new(Map::new()));
 	let entities: Arc<Mutex<Vec<Arc<Mutex<Entity>>>>> = Arc::new(Mutex::new(Vec::new()));
+	
 
 	for request in server.filter_map(Result::ok) {
 		let map = Arc::clone(&map);
 		let entities = Arc::clone(&entities);
+
+		{
+			let mut map = map.lock().unwrap();
+			map[(9_223_372_036_854_775_808, 9_223_372_036_854_775_808)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
+		}
 
 		thread::spawn(move || {
 			let client = request.use_protocol("dungeon_game_protocol").accept().unwrap();
@@ -30,6 +39,22 @@ fn main() {
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 
+			let (tx, rx) = channel::<OwnedMessage>();
+			thread::spawn(move || {
+				loop {
+					let message = rx.recv().unwrap();
+					sender.send_message(&message).expect("can't send throught websocket");
+				}
+			});
+
+			let tx2 = tx.clone();
+			thread::spawn(move || {
+				loop {
+					thread::sleep(Duration::from_millis(16));
+					tx2.send(OwnedMessage::Text(Message::Tick.encode())).expect("can't send throught channel");
+				}
+			});
+
 			for message in receiver.incoming_messages() {
 				let player = Arc::clone(&player);
 				let message = message.expect("can't read message");
@@ -37,13 +62,13 @@ fn main() {
 				match message {
 					OwnedMessage::Close(_) => {
 						let message = OwnedMessage::Close(None);
-						sender.send_message(&message).expect("can't send message after close");
+						tx.send(message).unwrap();
 						println!("{} disconnected", player.lock().unwrap().get_name());
 						return;
 					}
 					OwnedMessage::Ping(ping) => {
 						let message = OwnedMessage::Pong(ping);
-						sender.send_message(&message).expect("can't send response to ping");
+						tx.send(message).unwrap();
 					}
 					OwnedMessage::Text(data) => {
 						if let Ok(message) = Message::decode(data) {
@@ -51,13 +76,13 @@ fn main() {
 								Message::Init{username, screen_width, screen_height, password} => {
 									println!("{} has connected", username);
 								    { player.lock().unwrap().set_entity_name(username); }
-									sender.send_message(&OwnedMessage::Text(Message::CreateEntity(player.lock().unwrap().clone()).encode())).expect("can't send this");
+									tx.send(OwnedMessage::Text(Message::CreateEntity(player.lock().unwrap().clone()).encode())).unwrap();
 									entities.lock().unwrap().push(player);
 
 									let map = map.lock().unwrap();
 									for i in 0..6 {
 										for j in 0..4 {
-											sender.send_message(&OwnedMessage::Text(Message::Chunk(map.get_chunk(chunk_left_top_coords.0 + i * 8, chunk_left_top_coords.1 + j * 8)).encode())).expect("can't send chunk");
+											tx.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(chunk_left_top_coords.0 + i * 8, chunk_left_top_coords.1 + j * 8)).encode())).unwrap();
 										}
 									}
 								},

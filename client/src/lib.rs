@@ -1,4 +1,4 @@
-use wasm_game_lib::{graphics::canvas::*, graphics::image::*, graphics::sprite::*, system::util::*, events::*};
+use wasm_game_lib::{graphics::canvas::*, graphics::image::*, graphics::sprite::*, system::util::*, events::keyboard::{KeyboardManager, Key}};
 use wasm_bindgen::{prelude::*, JsCast};
 use protocol::message::Message;
 use protocol::entity::*;
@@ -32,48 +32,19 @@ macro_rules! println {
     ($($t:tt)*) => (log(&format_args!($($t)*).to_string()))
 }
 
-fn map_coords_to_screen_coords((x, y): (u64, u64), (cx, cy): (u64, u64), (width, height): (u32, u32)) -> (u32, u32) {
-    /*println!("{} {}", x, y);
-    println!("{} {}", cx, cy);
-    println!("{} {}", x as i128 - cx as i128, y as i128 - cy as i128);
-    println!("{} {}", (x as i128 - cx as i128) * 40, (y as i128 - cy as i128) * 40);
-    panic!("{} {}", (x as i128 - cx as i128) as u32 * 40 + width / 2, (y as i128 - cy as i128) as u32 * 40 + height / 2);*/
-    ((x - cx) as u32 * 40 + width / 2, (y - cy) as u32 * 40 + height / 2)
-}
-
 fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
+    println!("Game is ready!");
+
     let mut canvas = Canvas::new();
-    // TODO Smooth
-
-    // configure the websocket
-    let (tx, rx) = channel::<Message>();
-    let message = Closure::wrap(Box::new(move |event: MessageEvent| {
-        if let Some(data) = event.data().as_string() {
-            match Message::decode(data) {
-                Ok(message) => if let Err(error) = tx.send(message) {
-                    panic!("error while using transmitter: {}", error);
-                },
-                Err(error) => println!("error decoding message: {}", error),
-            };
-        } else {
-            println!("can't read message as string");
-        }
-    }) as Box<dyn FnMut(MessageEvent)>);
-    websocket
-        .add_event_listener_with_callback("message", message.as_ref().unchecked_ref())
-        .unwrap();
-    message.forget();
-
-    websocket.send_with_str(&Message::Init{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
-
+    let keyboard = KeyboardManager::new();
     let mut player: Option<Entity> = None;
     let mut chunks: Vec<Chunk> = Vec::new();
-    
-    println!("Game is ready!");
-    let main_loop = Closure::wrap(Box::new(move || {
-        // inputs
-        while let Ok(message) = rx.try_recv() {
-            match message {
+    let websocket2 = Rc::clone(&websocket);
+
+    websocket.send_with_str(&Message::Init{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
+    let message = Closure::wrap(Box::new(move |event: MessageEvent| {
+        if let Some(data) = event.data().as_string() {
+            match Message::decode(data).expect("can't deserialize message") {
                 Message::ChatMessage{sender_id: _, receiver_id: _, message} => {
                     println!("{}", message);
                 },
@@ -85,53 +56,60 @@ fn main(images: Vec<Image>, websocket: Rc<WebSocket>) {
                         player = Some(entity);
                     }
                 },
-                Message::Init{username: _, password: _, screen_width: _, screen_height: _} => {
-                    panic!("server is not intented to send init");
-                }
-            };
-        }
-
-        // draw
-        canvas.clear();
-        if let Some(player) = &player {
-            let (x, y) = player.get_coords();
-            for chunk in &chunks {
-                
-                let x = (chunk.x - x) as usize * 40 + ((canvas.get_size().0 - canvas.get_size().0%40) / 2) as usize;
-                let y = (chunk.y - y) as usize * 40 + ((canvas.get_size().1 - canvas.get_size().1%40) / 2) as usize;
-                
-                for i in 0..8 {
-                    for j in 0..8 {
-                        match chunk.blocks[i][j].get_block_code() {
-                            BlockCode::SimpleSlab => {
-                                //let (x, y) = player.get_coords();
-                                //let coords = map_coords_to_screen_coords((chunk.x + i as u64, chunk.y + j as u64), (x as u64, y as u64), (canvas.get_size().0, canvas.get_size().1));
-                                canvas.draw_image_with_size((x + i * 40) as f64, (y + j * 40) as f64, 40.0, 40.0, &images[0]);
-                                //canvas.draw_image_with_size(coords.0 as f64, coords.1 as f64, 40.0, 40.0, &images[0])
-                                //canvas.fill_rect(((x + i * 40) as f64, (y + j * 40) as f64), (40.0, 40.0));
-                            },
-                            BlockCode::SimpleWall => {
-                                canvas.draw_image_with_size((x + i * 40) as f64, (y + j * 40) as f64, 40.0, 40.0, &images[1])
+                Message::Tick => {
+                    if let Some(player) = &mut player {
+                        if keyboard.get_key(Key::Q) {
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Left}.encode()).unwrap();
+                            player.move_in_direction(Orientation::Left);
+                        } else if keyboard.get_key(Key::D) {
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Right}.encode()).unwrap();
+                            player.move_in_direction(Orientation::Right);
+                        } else if keyboard.get_key(Key::Z) {
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Up}.encode()).unwrap();
+                            player.move_in_direction(Orientation::Up);
+                        } else if keyboard.get_key(Key::S) {
+                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), lenght: player.get_speed(), direction: Orientation::Down}.encode()).unwrap();
+                            player.move_in_direction(Orientation::Down);
+                        }
+                        
+                        canvas.clear();
+                        let (x, y) = player.get_coords();
+                        println!("{} {}", x, y);
+                        for chunk in &chunks {
+                            let x = (chunk.x - x) as isize * 40 + (canvas.get_size().0 / 2) as isize - player.get_position_in_block().0 as isize;
+                            let y = (chunk.y - y) as isize * 40 + (canvas.get_size().1 / 2) as isize - player.get_position_in_block().1 as isize;
+                            
+                            for i in 0..8 {
+                                for j in 0..8 {
+                                    match chunk.blocks[i][j].get_block_code() {
+                                        BlockCode::SimpleSlab => {
+                                            canvas.draw_image_with_size((x + i as isize * 40) as f64, (y + j as isize * 40) as f64, 40.0, 40.0, &images[0]);
+                                        },
+                                        BlockCode::SimpleWall => {
+                                            canvas.draw_image_with_size((x + i as isize * 40) as f64, (y + j as isize * 40) as f64, 40.0, 40.0, &images[1])
+                                        }
+                                    }
+                                }
                             }
                         }
+
+                        canvas.draw_image_with_size(((canvas.get_size().0) / 2) as f64, ((canvas.get_size().1) / 2) as f64, 40.0, 40.0, &images[2])
                     }
                 }
-            }
-
-            canvas.draw_image_with_size(((canvas.get_size().0 - canvas.get_size().0%40) / 2) as f64, ((canvas.get_size().1 - canvas.get_size().1%40) / 2) as f64, 40.0, 40.0, &images[2])
+                i => {
+                    panic!("server is not intented to send this {:?}", i);
+                }
+            };
+        } else {
+            println!("can't read message as string");
         }
-        
+    }) as Box<dyn FnMut(MessageEvent)>);
+    websocket2
+        .add_event_listener_with_callback("message", message.as_ref().unchecked_ref())
+        .unwrap();
+    message.forget();
 
-        
-    }) as Box<dyn FnMut()>);
 
-    window()
-        .set_interval_with_callback_and_timeout_and_arguments_0(
-            main_loop.as_ref().unchecked_ref(),
-            16,
-        )
-        .expect("Can't launch main loop");
-    main_loop.forget();
 }
 
 fn setup_websocket(images: Vec<Image>) {
