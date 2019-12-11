@@ -1,6 +1,7 @@
 use std::ops::{Index, IndexMut};
 use crate::block::{Block, Chunk};
 
+#[derive(Default)]
 pub struct Map {
     chunks: Vec<Chunk>,
     default_block: Block,
@@ -46,7 +47,22 @@ impl Map {
             }
             idx += 1;
         }
-        self.chunks.push(Chunk::new(first_block_x, first_block_y * 8, blocks));
+        self.chunks.push(Chunk::new(first_block_x, first_block_y, blocks));
+    }
+
+    pub fn delete_chunk(&mut self, x: u64, y: u64) {
+        let x_in_chunk = x % 8;
+        let y_in_chunk = y % 8;
+        let first_block_x = x - x_in_chunk;
+        let first_block_y = y - y_in_chunk;
+        let mut idx = 0;
+        while idx < self.chunks.len() {
+            if self.chunks[idx].x == first_block_x && self.chunks[idx].y == first_block_y {
+                self.chunks.remove(idx);
+                return;
+            }
+            idx += 1;
+        }
     }
 }
 

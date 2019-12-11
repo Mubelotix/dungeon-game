@@ -2,6 +2,8 @@ use serde::{Serialize, Deserialize};
 use getrandom::getrandom;
 use crate::block::Orientation;
 
+const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
+
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum EntityType {
     You,
@@ -48,6 +50,10 @@ impl Entity {
         }
     }
 
+    pub fn get_readable_coords(&self) -> (i64, i64) {
+        ((self.x as i128 - CENTER_POINT as i128) as i64, (self.y as i128 - CENTER_POINT as i128) as i64)
+    }
+
     pub fn set_entity_name(&mut self, name: String) {
         self.name = name;
     }
@@ -73,6 +79,13 @@ impl Entity {
         self.y = y;
         self.x2 = 0;
         self.y2 = 0;
+    }
+
+    pub fn set_position(&mut self, (x, y): (u64, u64), (x2, y2): (u8, u8)) {
+        self.x = x;
+        self.y = y;
+        self.x2 = x2;
+        self.y2 = y2;
     }
 
     pub fn get_position_in_block(&self) -> (u8, u8) {
@@ -153,6 +166,12 @@ impl Entity {
             }
         };
         (x, y)
+    }
+}
+
+impl Default for Entity {
+    fn default() -> Self {
+        Entity::spawn_player(String::from("undefined"))
     }
 }
 

@@ -5,9 +5,12 @@ use protocol::entity::*;
 use protocol::block::*;
 use web_sys::{WebSocket, Event, MessageEvent};
 use std::rc::Rc;
-use std::sync::mpsc::channel;
+use protocol::map::Map;
 use std::panic;
+use std::collections::HashMap;
 use console_error_panic_hook;
+
+const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
 
 #[wasm_bindgen]
 extern "C" {
@@ -37,8 +40,9 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
 
     let mut canvas = Canvas::new();
     let keyboard = KeyboardManager::new();
-    let mut player: Option<Entity> = None;
-    let mut chunks: Vec<Chunk> = Vec::new();
+    let mut entities: HashMap<u64, Entity> = HashMap::new();
+    let mut player_id: u64 = 0;
+    let mut map: Map = Map::new();
     let websocket2 = Rc::clone(&websocket);
     
     for image in &mut images {
@@ -54,15 +58,18 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                     println!("{}", message);
                 },
                 Message::Chunk(chunk) => {
-                    chunks.push(chunk);
+                    map.set_chunk(chunk.x, chunk.y, chunk.blocks);
                 },
                 Message::CreateEntity(entity) => {
                     if entity.get_entity_type() == EntityType::You {
-                        player = Some(entity);
+                        player_id = entity.get_id();
                     }
+                    entities.insert(entity.get_id(), entity);
                 },
                 Message::Tick => {
-                    if let Some(player) = &mut player {
+                    if player_id != 0 {
+                        let player = &mut entities.get_mut(&player_id).unwrap();
+
                         if keyboard.get_key(Key::Q) {
                             websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Left}.encode()).unwrap();
                             player.move_in_direction(Orientation::Left);
@@ -78,31 +85,42 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                         }
                         
                         canvas.clear();
-                        let (x, y) = player.get_coords();
-                        println!("{} {}", x, y);
-                        for chunk in &chunks {
-                            let x = (chunk.x - x) as isize * 40 + (canvas.get_size().0 / 2) as isize - player.get_position_in_block().0 as isize;
-                            let y = (chunk.y - y) as isize * 40 + (canvas.get_size().1 / 2) as isize - player.get_position_in_block().1 as isize;
+                        let (x1, y1) = player.get_coords();
+                        println!("{:?}", player.get_readable_coords());
+                        
+                        let x = -25 * 40 + (canvas.get_size().0 / 2) as isize - player.get_position_in_block().0 as isize;
+                        let y = -15 as isize * 40 + (canvas.get_size().1 / 2) as isize - player.get_position_in_block().1 as isize;
                             
-                            for i in 0..8 {
-                                for j in 0..8 {
-                                    match chunk.blocks[i][j].get_block_code() {
+                            for i in 0..50 {
+                                for j in 0..30 {
+                                    let i: isize = i - 25;
+                                    let j: isize = j - 15;
+
+                                    match map[(x1 + i as u64, y1 + j as u64)].get_block_code() {
                                         BlockCode::SimpleSlab => {
-                                            canvas.draw_image((x + i as isize * 40) as f64, (y + j as isize * 40) as f64 + 80.0, &images[0]);
+                                            canvas.draw_image((x + (i as isize + 25) * 40) as f64, (y + (j as isize + 15) * 40) as f64 + 80.0, &images[0]);
                                         },
                                         BlockCode::SimpleWall => {
-                                            canvas.draw_image((x + i as isize * 40) as f64, (y + j as isize * 40) as f64 + 80.0, &images[1])
+                                            canvas.draw_image((x + (i as isize + 25) * 40) as f64, (y + (j as isize + 15) * 40) as f64 + 80.0, &images[1])
                                         }
                                     }
                                 }
                             }
-                        }
 
                         canvas.draw_image_with_size(((canvas.get_size().0) / 2) as f64, ((canvas.get_size().1) / 2) as f64, 40.0, 40.0, &images[2])
                     }
-                }
-                i => {
-                    panic!("server is not intented to send this {:?}", i);
+                },
+                Message::UnloadChunk{x, y} => {
+                    map.delete_chunk(x, y);
+                },
+                Message::Init{username: _, screen_width: _, screen_height: _, password: _} => {
+                    panic!("server is not intented to connect");
+                },
+                Message::MoveEntity{id, direction} => {
+                    entities.entry(id).or_default().move_in_direction(direction);
+                },
+                Message::TpEntity{id, x, y, x2, y2} => {
+                    entities.entry(id).or_default().set_position((x, y), (x2, y2));
                 }
             };
         } else {
