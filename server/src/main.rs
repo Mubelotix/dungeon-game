@@ -85,7 +85,7 @@ fn main() {
 	let entities: Arc<Mutex<HashMap<u64, Arc<Mutex<Entity>>>>> = Arc::new(Mutex::new(HashMap::new()));
 
 	{
-		let mut map = map.lock().unwrap();
+		let mut map = map.lock().expect("mutex can't be poisoned now");
 		for x in 0..12 {
 			map[(9_223_372_036_854_775_810 + x, 9_223_372_036_854_775_807)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
 		}
@@ -98,8 +98,6 @@ fn main() {
 
 	let entities2 = Arc::clone(&entities);
 	thread::spawn(move || {
-		
-		
 		loop {
 			let mut input = String::new();
 			io::stdin().read_line(&mut input).expect("expected stdin stream");
@@ -117,10 +115,16 @@ fn main() {
 							if let Ok(id) = words[1].parse::<u64>() {
 								if let Ok(x) = words[2].parse::<u64>() {
 									if let Ok(y) = words[3].parse::<u64>() {
-										let mut entities = entities2.lock().unwrap();
+										let mut entities = match entities2.lock() {
+											Ok(entities) => entities,
+											Err(poisoned) => poisoned.into_inner()
+										};
 										if let Entry::Occupied(entity) = entities.entry(id) {
 											let entity = Arc::clone(&entity.get());
-											let mut entity = entity.lock().unwrap();
+											let mut entity = match entity.lock() {
+												Ok(entity) => entity,
+												Err(poisoned) => poisoned.into_inner()
+											};
 											entity.set_coords((x, y));
 											println!("entity has been teleported successfully");
 										} else {
@@ -143,20 +147,28 @@ fn main() {
 						} else if words[1] == "players" {
 							let mut connected_players: Vec<(u64, _)> = Vec::new();
 							
-							let entities = entities2.lock().unwrap();
+							let entities = match entities2.lock() {
+								Ok(entities) => entities,
+								Err(poisoned) => poisoned.into_inner()
+							};
 							for (id, entity) in entities.iter() {
 								let entity_arc = Arc::clone(&entity);
-								let entity_arc2 = Arc::clone(&entity);
-								let entity = entity_arc.lock().unwrap();
+								let entity = match entity.lock() {
+									Ok(entity) => entity,
+									Err(poisoned) => poisoned.into_inner()
+								};
 								if entity.get_type() == EntityType::Player {
-									connected_players.push((*id, entity_arc2));
+									connected_players.push((*id, entity_arc));
 								}
 							}
 
 							println!("{} players connected", connected_players.len());
 
 							for (id, entity) in connected_players {
-								let entity = entity.lock().unwrap();
+								let entity = match entity.lock() {
+									Ok(entity) => entity,
+									Err(poisoned) => poisoned.into_inner()
+								};
 								println!("{} (id: {})", entity.get_name(), id);
 							}
 						} else {
@@ -183,20 +195,33 @@ fn main() {
 			let mut loaded_chunks_top_left: (u64, u64) = (9_223_372_036_854_775_808 - 4 * 8, 9_223_372_036_854_775_808 - 2 * 8);
 			let player = Arc::new(Mutex::new(Entity::spawn_player("undefined".to_string())));
 			let player2 = Arc::clone(&player);
-			let player_id: u64 = {player.lock().unwrap().get_id()};
+			let player_id: u64 = {player.lock().expect("mutex can't be poisoned now").get_id()};
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 
 			{
-				let mut entities = entities.lock().unwrap();
-				entities.insert(player.lock().unwrap().get_id(), Arc::clone(&player));
+				let mut entities = match entities.lock() {
+					Ok(entities) => entities,
+					Err(poisoned) => poisoned.into_inner()
+				};
+				let player_unlocked = match player.lock() {
+					Ok(player) => player,
+					Err(poisoned) => poisoned.into_inner()
+				};
+				entities.insert(player_unlocked.get_id(), Arc::clone(&player));
 			}
 
 			let (tx, rx) = channel::<OwnedMessage>();
 			thread::spawn(move || {
 				let disconnect = || {
-					let player = player2.lock().unwrap();
-					let mut entities = entities.lock().unwrap();
+					let player = match player2.lock() {
+						Ok(player2) => player2,
+						Err(poisoned) => poisoned.into_inner()
+					};
+					let mut entities = match entities.lock() {
+						Ok(entities) => entities,
+						Err(poisoned) => poisoned.into_inner()
+					};
 					entities.remove(&player.get_id());
 					println!("\x1B[90m[{}]\x1B[0m {} has disconnected.", Local::now().format("%T"), player.get_name());
 				};
@@ -244,14 +269,20 @@ fn main() {
 										println!("\x1B[90m[{}]\x1B[0m {} has connected.", Local::now().format("%T"), username);
 	
 										{
-											let mut player = player.lock().unwrap();
+											let mut player = match player.lock() {
+												Ok(player) => player,
+												Err(poisoned) => poisoned.into_inner()
+											};
 											player.set_entity_name(username);
 											if tx.send(OwnedMessage::Text(Message::CreateEntity(player.clone()).encode())).is_err() { break; }
 											if tx.send(OwnedMessage::Text(Message::InitClient{id: player.get_id()}.encode())).is_err() { break; }
 										}
 										
 	
-										let map = map.lock().unwrap();
+										let map = match map.lock() {
+											Ok(map) => map,
+											Err(poisoned) => poisoned.into_inner()
+										};
 										for i in 0..8 {
 											for j in 0..4 {
 												if tx.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(loaded_chunks_top_left.0 + i * 8, loaded_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
@@ -260,13 +291,19 @@ fn main() {
 									},
 									Message::MoveEntity{id, direction} => {
 										if id == player_id {
-											let map = map.lock().unwrap();
-											let mut player = player.lock().unwrap();
+											let map = match map.lock() {
+												Ok(map) => map,
+												Err(poisoned) => poisoned.into_inner()
+											};
+											let mut player = match player.lock() {
+												Ok(player) => player,
+												Err(poisoned) => poisoned.into_inner()
+											};
 											if !map[player.get_coords_after_eventual_move(direction)].is_solid() {
 												player.move_in_direction(direction);
 											} else {
 												println!("can't move in a solid block");
-												tx.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), x: player.get_coords().0, y: player.get_coords().1, x2: player.get_position_in_block().0, y2: player.get_position_in_block().1}.encode())).unwrap();
+												if tx.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), x: player.get_coords().0, y: player.get_coords().1, x2: player.get_position_in_block().0, y2: player.get_position_in_block().1}.encode())).is_err() { break; };
 											}
 											let player_chunk_coords = (player.get_coords().0 - (player.get_coords().0 % 8), player.get_coords().1 - (player.get_coords().1 % 8));
 											let needed_chunks_top_left = (player_chunk_coords.0 - 4*8, player_chunk_coords.1 - 2*8);
@@ -325,7 +362,11 @@ fn main() {
 						}
 					}
 				} else {
-					println!("\x1B[90m[{}]\x1B[0m {} has disconnected brutally.", Local::now().format("%T"), player.lock().unwrap().get_name());
+					let player = match player.lock() {
+						Ok(player) => player,
+						Err(poisoned) => poisoned.into_inner()
+					};
+					println!("\x1B[90m[{}]\x1B[0m {} has disconnected brutally.", Local::now().format("%T"), player.get_name());
 				}
 			}
 		});
