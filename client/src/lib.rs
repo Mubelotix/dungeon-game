@@ -1,4 +1,4 @@
-use wasm_game_lib::{graphics::canvas::*, graphics::image::*, graphics::sprite::*, system::util::*, events::keyboard::{KeyboardManager, Key}};
+use wasm_game_lib::{graphics::canvas::*, graphics::image::*, events::keyboard::{KeyboardManager, Key}};
 use wasm_bindgen::{prelude::*, JsCast};
 use protocol::message::Message;
 use protocol::entity::*;
@@ -38,7 +38,7 @@ macro_rules! println {
 fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
     println!("Game is ready!");
 
-    let mut canvas = Canvas::new();
+    let mut canvas = Canvas::new(true);
     let keyboard = KeyboardManager::new();
     let mut entities: HashMap<u64, Entity> = HashMap::new();
     let mut player_id: u64 = 0;
@@ -50,7 +50,7 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
     }
     images[2].set_origin((0.0, 0.0));
 
-    websocket.send_with_str(&Message::Init{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
+    websocket.send_with_str(&Message::InitServer{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
     let message = Closure::wrap(Box::new(move |event: MessageEvent| {
         if let Some(data) = event.data().as_string() {
             match Message::decode(data).expect("can't deserialize message") {
@@ -61,9 +61,6 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                     map.set_chunk(chunk.x, chunk.y, chunk.blocks);
                 },
                 Message::CreateEntity(entity) => {
-                    if entity.get_entity_type() == EntityType::You {
-                        player_id = entity.get_id();
-                    }
                     entities.insert(entity.get_id(), entity);
                 },
                 Message::Tick => {
@@ -86,7 +83,7 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                         
                         canvas.clear();
                         let (x1, y1) = player.get_coords();
-                        println!("{:?}", player.get_readable_coords());
+                        //println!("{:?}", player.get_readable_coords());
                         
                         let x = -25 * 40 + (canvas.get_size().0 / 2) as isize - player.get_position_in_block().0 as isize;
                         let y = -15 as isize * 40 + (canvas.get_size().1 / 2) as isize - player.get_position_in_block().1 as isize;
@@ -113,8 +110,11 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::UnloadChunk{x, y} => {
                     map.delete_chunk(x, y);
                 },
-                Message::Init{username: _, screen_width: _, screen_height: _, password: _} => {
+                Message::InitServer{username: _, screen_width: _, screen_height: _, password: _} => {
                     panic!("server is not intented to connect");
+                },
+                Message::InitClient{id} => {
+                    player_id = id;
                 },
                 Message::MoveEntity{id, direction} => {
                     entities.entry(id).or_default().move_in_direction(direction);

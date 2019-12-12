@@ -7,3 +7,4 @@ edition = "2018"
 [dependencies]
 websocket = "0.24.0"
 protocol = { path = "../protocol" }
+chrono = "0.4.10"

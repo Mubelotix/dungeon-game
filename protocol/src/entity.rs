@@ -6,9 +6,8 @@ const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Copy)]
 pub enum EntityType {
-    You,
     Player,
-    Ennemy
+    Mob
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone)]
@@ -46,7 +45,7 @@ impl Entity {
             y2: 0,
             id,
             name,
-            entity_type: EntityType::You
+            entity_type: EntityType::Player
         }
     }
 
@@ -62,7 +61,7 @@ impl Entity {
         &self.name
     }
 
-    pub fn get_entity_type(&self) -> EntityType {
+    pub fn get_type(&self) -> EntityType {
         self.entity_type
     }
 
