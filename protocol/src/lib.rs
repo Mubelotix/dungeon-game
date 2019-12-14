@@ -6,3 +6,4 @@ pub mod block;
 pub mod message;
 pub mod entity;
 pub mod map;
+pub mod coords;
