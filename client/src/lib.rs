@@ -1,14 +1,33 @@
-use wasm_game_lib::{graphics::canvas::*, graphics::image::*, events::keyboard::{KeyboardManager, Key}};
-use wasm_bindgen::{prelude::*, JsCast};
-use protocol::message::Message;
-use protocol::entity::*;
-use protocol::block::*;
-use web_sys::{WebSocket, Event, MessageEvent};
-use std::rc::Rc;
-use protocol::map::Map;
-use std::panic;
-use std::collections::HashMap;
 use console_error_panic_hook;
+use wasm_game_lib::{
+    graphics::canvas::*,
+    graphics::image::*,
+    events::keyboard::{
+        KeyboardManager,
+        Key,
+    },
+};
+use wasm_bindgen::{
+    prelude::*,
+    JsCast
+};
+use protocol::{
+    message::Message,
+    entity::*,
+    block::*,
+    map::Map,
+};
+use web_sys::{
+    WebSocket,
+    Event,
+    MessageEvent,
+    ErrorEvent
+};
+use std::{
+    rc::Rc,
+    panic,
+    collections::HashMap,
+};
 
 const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
 
@@ -146,15 +165,88 @@ fn setup_websocket(images: Vec<Image>) {
         let websocket = Rc::clone(&websocket2);
         main(images, websocket);
     }) as Box<dyn FnMut(Event)>);
+    let error = Closure::wrap(Box::new(move |event: Event| {
+        panic!("Can't connect to server.");
+    }) as Box<dyn FnMut(Event)>);
     websocket
         .add_event_listener_with_callback("open", open.as_ref().unchecked_ref())
         .unwrap();
+    websocket
+        .add_event_listener_with_callback("error", error.as_ref().unchecked_ref())
+        .unwrap();
     open.forget();
+    error.forget();
 }
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
-    panic::set_hook(Box::new(console_error_panic_hook::hook));
+    panic::set_hook(Box::new(|panic_info| {
+        println!("panic");
+
+        let window = match web_sys::window() {
+            Some(window) => window,
+            None => {
+                println!("no window");
+                return;
+            }
+        };
+        let document = match window.document() {
+            Some(document) => document,
+            None => {
+                println!("no document");
+                return;
+            }
+        };
+        let body = match document.body() {
+            Some(body) => body,
+            None => {
+                println!("no body");
+                return;
+            }
+        };
+
+        let element = match document.create_element("div") {
+            Ok(element) => element,
+            Err(error) => {
+                println!("{:?}", error);
+                return;
+            }
+        };
+        let element = match element.dyn_into::<web_sys::HtmlDivElement>() {
+            Ok(element) => element,
+            Err(error) => {
+                println!("{:?}", error);
+                return;
+            }
+        };
+
+        if let Err(error) = body.append_child(&element) {
+            println!("can't append child because {:?}", error);
+            return;
+        }
+        if let Err(error) = element.set_attribute("class", "panic_window") {
+            println!("can't set class to panic_window because {:?}", error);
+        }
+
+        if let Some(message) = panic_info.payload().downcast_ref::<&str>() {
+            element.set_inner_html(&format!("\
+            PANIC:<br>\
+            {}\
+            ", message));
+        } else if let Some(message) = panic_info.payload().downcast_ref::<String>() {
+            element.set_inner_html(&format!("\
+            PANIC:<br>\n\
+            {}\
+            ", message));
+        } else {
+            element.set_inner_html(&format!("\
+            PANIC:<br>\n\
+            {}\
+            ", "undefined"));
+        }
+        
+    }));
+
     println!("Loading textures...");
     Image::load_images(vec![
         "https://mubelotix.dev/dungeon_game/textures/simple_slab.jpg",

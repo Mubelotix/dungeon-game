@@ -32,8 +32,8 @@ features = [
   'Event',
   'EventTarget',
   'MessageEvent',
-  'Blob',
-  'BinaryType'
+  'HtmlDivElement',
+  'ErrorEvent'
 ]
 
 overflow-checks = true
