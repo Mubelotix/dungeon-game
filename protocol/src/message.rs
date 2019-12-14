@@ -1,5 +1,6 @@
 use crate::block::{Orientation, Chunk};
 use crate::entity::Entity;
+use crate::coords::Coords;
 use serde::{Serialize, Deserialize};
 
 #[derive(Debug, PartialEq, Serialize, Deserialize)]
@@ -11,8 +12,8 @@ pub enum Message {
     InitServer{username: String, screen_width: u32, screen_height: u32, password: Option<String>},
     InitClient{id: u64},
     Tick,
-    MoveEntity{id: u64, direction: Orientation},
-    TpEntity{id: u64, x: u64, y: u64, x2: u8, y2: u8},
+    MoveEntity{id: u64, direction: Orientation}, // will be removed soon!
+    TpEntity{id: u64, coords: Coords},
 }
 
 impl Message {

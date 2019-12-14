@@ -1,9 +1,13 @@
 use std::ops::Add;
+use std::ops::AddAssign;
 use std::ops::Sub;
+use std::ops::SubAssign;
+use std::convert::Into;
+use serde::{Serialize, Deserialize};
 
 /// A simple struct used to manage to axis coordinates
 /// Sub and Add traits are implemented
-#[derive(PartialEq, Debug, Clone)]
+#[derive(PartialEq, Debug, Clone, Serialize, Deserialize)]
 pub struct Coords {
     pub x: SingleAxis,
     pub y: SingleAxis
@@ -18,6 +22,12 @@ impl Coords {
     }
 }
 
+impl Into<(u64, u64)> for Coords {
+    fn into(self) -> (u64, u64) {
+        (self.x.main, self.y.main)
+    }
+}
+
 impl Add for Coords {
     type Output = Self;
 
@@ -26,6 +36,13 @@ impl Add for Coords {
             x: self.x + other.x,
             y: self.y + other.y
         }
+    }
+}
+
+impl AddAssign for Coords {
+    fn add_assign(&mut self, other: Self) {
+        self.x += other.x;
+        self.y += other.y;
     }
 }
 
@@ -40,6 +57,13 @@ impl Sub for Coords {
     }
 }
 
+impl SubAssign for Coords {
+    fn sub_assign(&mut self, other: Self) {
+        self.x -= other.x;
+        self.y -= other.y;
+    }
+}
+
 impl Default for Coords {
     fn default() -> Self {
         Coords::new(SingleAxis::default(), SingleAxis::default())
@@ -51,10 +75,10 @@ impl Default for Coords {
 /// Use the additionnal coordinates to store where the player is located on the block located on the main coordinates
 /// Additionnal value must not be higher than 127
 /// You can modify directly the coordinates
-#[derive(PartialEq, Debug, Clone, Copy)]
+#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SingleAxis {
     pub main: u64,
-    pub additionnal: u8,
+    additionnal: u8,
 }
 
 impl SingleAxis {
@@ -65,11 +89,15 @@ impl SingleAxis {
             additionnal
         }
     }
+
+    pub fn get_additionnal(&self) -> u8 {
+        self.additionnal
+    }
 }
 
 impl Default for SingleAxis {
     fn default() -> Self {
-        SingleAxis::new(0, 0)
+        SingleAxis::new(9_223_372_036_854_775_808, 0) // the center
     }
 }
 
@@ -84,6 +112,12 @@ impl Add for SingleAxis {
     }
 }
 
+impl AddAssign for SingleAxis {
+    fn add_assign(&mut self, other: Self) {
+        *self = *self + other;
+    }
+}
+
 impl Sub for SingleAxis {
     type Output = Self;
 
@@ -95,6 +129,12 @@ impl Sub for SingleAxis {
             total_main -= 1;
         }
         SingleAxis::new(total_main, total_additionnal as u8)
+    }
+}
+
+impl SubAssign for SingleAxis {
+    fn sub_assign(&mut self, other: Self) {
+        *self = *self - other;
     }
 }
 

@@ -107,7 +107,7 @@ fn main() {
 					"help" => println!("COMMANDS LIST:\n\
 						- help => display this page\n\
 						- tp [id] [x] [y] => teleport an entity where you want\n\
-						- list_entities player => list the connected players"),
+						- list_entities players => list the connected players"),
 					"tp" => {
 						if words.len() != 4 {
 							println!("tp command require 3 arguments");
@@ -125,7 +125,8 @@ fn main() {
 												Ok(entity) => entity,
 												Err(poisoned) => poisoned.into_inner()
 											};
-											entity.set_coords((x, y));
+											entity.coords.x.main = x;
+											entity.coords.y.main = y;
 											println!("entity has been teleported successfully");
 										} else {
 											println!("entity does not exist. check existing entity with the command list");
@@ -157,7 +158,7 @@ fn main() {
 									Ok(entity) => entity,
 									Err(poisoned) => poisoned.into_inner()
 								};
-								if entity.get_type() == EntityType::Player {
+								if *entity.get_type() == EntityType::Player {
 									connected_players.push((*id, entity_arc));
 								}
 							}
@@ -289,7 +290,7 @@ fn main() {
 											}
 										}
 									},
-									Message::MoveEntity{id, direction} => {
+									Message::TpEntity{id, coords} => {
 										if id == player_id {
 											let map = match map.lock() {
 												Ok(map) => map,
@@ -299,13 +300,12 @@ fn main() {
 												Ok(player) => player,
 												Err(poisoned) => poisoned.into_inner()
 											};
-											if !map[player.get_coords_after_eventual_move(direction)].is_solid() {
-												player.move_in_direction(direction);
+											if !map[coords.clone().into()].is_solid() {
+												player.coords = coords;
 											} else {
-												println!("can't move in a solid block");
-												if tx.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), x: player.get_coords().0, y: player.get_coords().1, x2: player.get_position_in_block().0, y2: player.get_position_in_block().1}.encode())).is_err() { break; };
+												if tx.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), coords: player.coords.clone()}.encode())).is_err() { break; };
 											}
-											let player_chunk_coords = (player.get_coords().0 - (player.get_coords().0 % 8), player.get_coords().1 - (player.get_coords().1 % 8));
+											let player_chunk_coords = (player.coords.x.main - (player.coords.x.main % 8), player.coords.y.main - (player.coords.y.main % 8));
 											let needed_chunks_top_left = (player_chunk_coords.0 - 4*8, player_chunk_coords.1 - 2*8);
 	
 											// if we must load chunks to left

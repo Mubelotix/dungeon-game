@@ -16,6 +16,7 @@ use protocol::{
     entity::*,
     block::*,
     map::Map,
+    coords::*,
 };
 use web_sys::{
     WebSocket,
@@ -85,27 +86,62 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::Tick => {
                     if player_id != 0 {
                         let player = &mut entities.get_mut(&player_id).unwrap();
-
+                        
+                        let mut direction_x: i8 = 0;
+                        let mut direction_y: i8 = 0;
                         if keyboard.get_key(Key::Q) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Left}.encode()).unwrap();
-                            player.move_in_direction(Orientation::Left);
-                        } else if keyboard.get_key(Key::D) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Right}.encode()).unwrap();
-                            player.move_in_direction(Orientation::Right);
-                        } else if keyboard.get_key(Key::Z) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Up}.encode()).unwrap();
-                            player.move_in_direction(Orientation::Up);
-                        } else if keyboard.get_key(Key::S) {
-                            websocket.send_with_str(&Message::MoveEntity{id: player.get_id(), direction: Orientation::Down}.encode()).unwrap();
-                            player.move_in_direction(Orientation::Down);
+                            direction_x -= 1;
                         }
+                        if keyboard.get_key(Key::D) {
+                            direction_x += 1;
+                        }
+                        if keyboard.get_key(Key::Z) {
+                            direction_y -= 1;
+                        }
+                        if keyboard.get_key(Key::S) {
+                            direction_y += 1;
+                        }
+
+                        match (direction_x, direction_y) {
+                            (0,0) => (),
+                            (0,y) => {
+                                if y == 1 {
+                                    player.coords.y += SingleAxis::new(0, player.get_speed());
+                                } else {
+                                    player.coords.y -= SingleAxis::new(0, player.get_speed());
+                                }
+                                websocket.send_with_str(&Message::TpEntity{id: player_id, coords: player.coords.clone()}.encode()).unwrap();
+                            },
+                            (x,0) => {
+                                if x == 1 {
+                                    player.coords.x += SingleAxis::new(0, player.get_speed());
+                                } else {
+                                    player.coords.x -= SingleAxis::new(0, player.get_speed());
+                                }
+                                websocket.send_with_str(&Message::TpEntity{id: player_id, coords: player.coords.clone()}.encode()).unwrap();
+                            },
+                            (x,y) => {
+                                let movement = (((player.get_speed()*player.get_speed())/2) as f64).sqrt().floor() as u8;
+                                if y == 1 {
+                                    player.coords.y += SingleAxis::new(0, movement);
+                                } else {
+                                    player.coords.y -= SingleAxis::new(0, movement);
+                                }
+                                if x == 1 {
+                                    player.coords.x += SingleAxis::new(0, movement);
+                                } else {
+                                    player.coords.x -= SingleAxis::new(0, movement);
+                                }
+                                websocket.send_with_str(&Message::TpEntity{id: player_id, coords: player.coords.clone()}.encode()).unwrap();
+                            },
+                        };
                         
                         canvas.clear();
-                        let (x1, y1) = player.get_coords();
+                        let (x1, y1) = (player.coords.x.main, player.coords.y.main);
                         //println!("{:?}", player.get_readable_coords());
                         
-                        let x = -25 * 40 + (canvas.get_size().0 / 2) as isize - player.get_position_in_block().0 as isize;
-                        let y = -15 as isize * 40 + (canvas.get_size().1 / 2) as isize - player.get_position_in_block().1 as isize;
+                        let x = -25 * 40 + (canvas.get_size().0 / 2) as isize - player.coords.x.get_additionnal() as isize;
+                        let y = -15 as isize * 40 + (canvas.get_size().1 / 2) as isize - player.coords.y.get_additionnal() as isize;
                             
                             for i in 0..50 {
                                 for j in 0..30 {
@@ -136,10 +172,10 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                     player_id = id;
                 },
                 Message::MoveEntity{id, direction} => {
-                    entities.entry(id).or_default().move_in_direction(direction);
+                    //entities.entry(id).or_default().move_in_direction(direction);
                 },
-                Message::TpEntity{id, x, y, x2, y2} => {
-                    entities.entry(id).or_default().set_position((x, y), (x2, y2));
+                Message::TpEntity{id, coords} => {
+                    entities.entry(id).or_default().coords = coords;
                 }
             };
         } else {
