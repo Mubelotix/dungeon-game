@@ -83,7 +83,6 @@ dependencies = [
 name = "client"
 version = "0.1.0"
 dependencies = [
- "console_error_panic_hook 0.1.6 (registry+https://github.com/rust-lang/crates.io-index)",
  "js-sys 0.3.32 (registry+https://github.com/rust-lang/crates.io-index)",
  "protocol 0.1.1",
  "serde 1.0.103 (registry+https://github.com/rust-lang/crates.io-index)",

@@ -9,7 +9,6 @@ use protocol::map::*;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::mpsc::channel;
-use std::time::Duration;
 use protocol::block::Block;
 use protocol::block::BlockCode;
 use protocol::block::Orientation;
@@ -18,6 +17,7 @@ use std::collections::HashMap;
 use std::collections::hash_map::Entry;
 use std::io;
 use std::process;
+use std::time::{Duration, SystemTime};
 
 const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
 
@@ -202,6 +202,7 @@ fn main() {
 			let player = Arc::new(Mutex::new(Entity::spawn_player("undefined".to_string())));
 			let player2 = Arc::clone(&player);
 			let player_id: u64 = {player.lock().expect("mutex can't be poisoned now").get_id()};
+			let mut waiting_ping: Option<SystemTime> = None;
 
 			let (mut receiver, mut sender) = client.split().unwrap();
 
@@ -352,6 +353,17 @@ fn main() {
 											}
 										} else {
 											println!("attempt to move an unowned entity");
+										}
+									},
+									Message::Ping => {
+										if waiting_ping == None {
+											if tx.send(OwnedMessage::Text(Message::Ping.encode())).is_err() { break; }
+										} else {
+											let waiting_ping = waiting_ping.unwrap();
+											match  waiting_ping.elapsed() {
+												Ok(elapsed) => log(format!("ping: {}ms", elapsed.as_millis())),
+												Err(e) => eprintln!("error while getting ping: {}", e)
+											}
 										}
 									},
 									message => {

@@ -1,4 +1,3 @@
-use console_error_panic_hook;
 use wasm_game_lib::{
     graphics::canvas::*,
     graphics::image::*,
@@ -21,8 +20,7 @@ use protocol::{
 use web_sys::{
     WebSocket,
     Event,
-    MessageEvent,
-    ErrorEvent
+    MessageEvent
 };
 use std::{
     rc::Rc,
@@ -58,20 +56,25 @@ macro_rules! println {
 fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
     println!("Game is ready!");
 
+    let window = web_sys::window().unwrap();
     let mut canvas = Canvas::new(true);
     let keyboard = KeyboardManager::new();
     let mut entities: HashMap<u64, Entity> = HashMap::new();
     let mut player_id: u64 = 0;
     let mut map: Map = Map::new();
     let websocket2 = Rc::clone(&websocket);
+    let mut waiting_ping: Option<f64> = None;
     
     for image in &mut images {
         image.set_origin((0.0, image.get_size().1 as f64));
     }
     images[2].set_origin((0.0, 0.0));
 
+    
+
     websocket.send_with_str(&Message::InitServer{username: String::from("Mubelotix"), screen_width: canvas.get_size().0, screen_height: canvas.get_size().1, password: None}.encode()).expect("can't send init message");
     let message = Closure::wrap(Box::new(move |event: MessageEvent| {
+        
         if let Some(data) = event.data().as_string() {
             match Message::decode(data).expect("can't deserialize message") {
                 Message::ChatMessage{sender_id: _, receiver_id: _, message} => {
@@ -100,6 +103,10 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                         }
                         if keyboard.get_key(Key::S) {
                             direction_y += 1;
+                        }
+                        if keyboard.get_key(Key::P) {
+                            waiting_ping = Some(window.performance().unwrap().now());
+                            websocket.send_with_str(&Message::Ping.encode()).unwrap();
                         }
 
                         match (direction_x, direction_y) {
@@ -171,8 +178,13 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::InitClient{id} => {
                     player_id = id;
                 },
-                Message::MoveEntity{id, direction} => {
-                    //entities.entry(id).or_default().move_in_direction(direction);
+                Message::Ping => {
+                    if waiting_ping == None {
+                        websocket.send_with_str(&Message::Ping.encode()).unwrap();
+                    } else {
+                        let waiting_ping = waiting_ping.unwrap();
+                        println!("ping: {}ms", window.performance().unwrap().now() - waiting_ping);
+                    }
                 },
                 Message::TpEntity{id, coords} => {
                     entities.entry(id).or_default().coords = coords;

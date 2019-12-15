@@ -12,7 +12,7 @@ pub enum Message {
     InitServer{username: String, screen_width: u32, screen_height: u32, password: Option<String>},
     InitClient{id: u64},
     Tick,
-    MoveEntity{id: u64, direction: Orientation}, // will be removed soon!
+    Ping,
     TpEntity{id: u64, coords: Coords},
 }
 
