@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+use core::fmt::Display;
 use std::thread;
 use websocket::sync::Server;
 use websocket::OwnedMessage;
@@ -19,6 +20,10 @@ use std::io;
 use std::process;
 
 const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
+
+fn log(message: impl Display) {
+	println!("\x1B[90m[{}]\x1B[0m {}", Local::now().format("%T"), message);
+}
 
 fn main() {
 	let server = match Server::bind("localhost:2794") {
@@ -183,7 +188,7 @@ fn main() {
 		}
 	});
 
-	println!("\x1B[90m[{}]\x1B[0m Server is running. Type help to see available commands.", Local::now().format("%T"));
+	
 	
 	
 	for request in server.filter_map(Result::ok) {
@@ -224,7 +229,7 @@ fn main() {
 						Err(poisoned) => poisoned.into_inner()
 					};
 					entities.remove(&player.get_id());
-					println!("\x1B[90m[{}]\x1B[0m {} has disconnected.", Local::now().format("%T"), player.get_name());
+					log(format!("{} has disconnected", player.get_name()));
 				};
 				loop {
 					if let Ok(message) = rx.recv() {
@@ -267,7 +272,7 @@ fn main() {
 							if let Ok(message) = Message::decode(data) {
 								match message {
 									Message::InitServer{username, screen_width: _, screen_height: _, password: _} => {
-										println!("\x1B[90m[{}]\x1B[0m {} has connected.", Local::now().format("%T"), username);
+										log(format!("{} has connected", username));
 	
 										{
 											let mut player = match player.lock() {
@@ -300,7 +305,7 @@ fn main() {
 												Ok(player) => player,
 												Err(poisoned) => poisoned.into_inner()
 											};
-											if !map[coords.clone().into()].is_solid() {
+											if !map[coords.clone().into()].is_solid() && player.coords.distance_from(&coords) <= player.get_speed().into() {
 												player.coords = coords;
 											} else {
 												if tx.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), coords: player.coords.clone()}.encode())).is_err() { break; };
@@ -366,7 +371,7 @@ fn main() {
 						Ok(player) => player,
 						Err(poisoned) => poisoned.into_inner()
 					};
-					println!("\x1B[90m[{}]\x1B[0m {} has disconnected brutally.", Local::now().format("%T"), player.get_name());
+					log(format!("{} has disconnected brutally", player.get_name()));
 				}
 			}
 		});

@@ -2,6 +2,8 @@ use std::ops::Add;
 use std::ops::AddAssign;
 use std::ops::Sub;
 use std::ops::SubAssign;
+use std::cmp::PartialOrd;
+use std::cmp::Ordering;
 use std::convert::Into;
 use serde::{Serialize, Deserialize};
 
@@ -19,6 +21,12 @@ impl Coords {
             x,
             y
         }
+    }
+
+    pub fn distance_from(&self, other: &Self) -> f64 {
+        let distance_x: f64 = self.x.distance_from(&other.x).into();
+        let distance_y: f64 = self.y.distance_from(&other.y).into();
+        (distance_x.powi(2) + distance_y.powi(2)).sqrt()
     }
 }
 
@@ -73,9 +81,9 @@ impl Default for Coords {
 /// A simple struct used to manage a single axis
 /// Use the main coordinates to store the coordinates
 /// Use the additionnal coordinates to store where the player is located on the block located on the main coordinates
-/// Additionnal value must not be higher than 127
+/// Additionnal value must not be less than 40 
 /// You can modify directly the coordinates
-#[derive(PartialEq, Debug, Clone, Copy, Serialize, Deserialize)]
+#[derive(PartialEq, Eq, Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct SingleAxis {
     pub main: u64,
     additionnal: u8,
@@ -92,6 +100,36 @@ impl SingleAxis {
 
     pub fn get_additionnal(&self) -> u8 {
         self.additionnal
+    }
+
+    pub fn distance_from(&self, other: &Self) -> SingleAxis {
+        if other > self {
+            *other - *self
+        } else {
+            *self - *other
+        }
+    }
+}
+
+impl Into<f64> for SingleAxis {
+    fn into(self) -> f64 {
+        self.main as f64 * 40.0 + self.additionnal as f64
+    }
+}
+
+impl Ord for SingleAxis {
+    fn cmp(&self, other: &SingleAxis) -> Ordering {
+        if self.main != other.main {
+            self.main.cmp(&other.main)
+        } else {
+            self.additionnal.cmp(&other.additionnal)
+        }
+    }
+}
+
+impl PartialOrd for SingleAxis {
+    fn partial_cmp(&self, other: &SingleAxis) -> Option<Ordering> {
+        Some(self.cmp(other))
     }
 }
 
@@ -143,8 +181,29 @@ mod tests {
     use super::*;
 
     #[test]
-    fn add_test() {
+    #[allow(clippy::float_cmp)]
+    fn test_distance_from() {
         let first = SingleAxis::default();
+        let second = first + SingleAxis::new(0, 3);
+        let third = second - SingleAxis::new(0, 6);
+        let fourth = third + SingleAxis::new(3, 28);
+
+        assert_eq!(first.distance_from(&second), SingleAxis::new(0, 3));
+        assert_eq!(first.distance_from(&third), SingleAxis::new(0, 3));
+        assert_eq!(first.distance_from(&fourth), SingleAxis::new(3, 25));
+
+        let first = Coords::default();
+        let second = Coords::new(first.x + SingleAxis::new(0, 3), first.y);
+        let third = Coords::new(second.x, second.y + SingleAxis::new(0, 3));
+
+        
+        assert_eq!(first.distance_from(&second), 3.0);
+        assert_eq!(first.distance_from(&third), 4.242_640_687_119_285);
+    }
+
+    #[test]
+    fn add_test() {
+        let first = SingleAxis::new(0, 0);
         let second = first + SingleAxis::new(1, 0);
         let third = second + SingleAxis::new(0, 40);
         let fourth = third + SingleAxis::new(1, 41);
