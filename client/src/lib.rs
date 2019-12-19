@@ -189,6 +189,9 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
                 Message::TpEntity{id, coords} => {
                     entities.entry(id).or_default().coords = coords;
                 }
+                Message::Kick(reason) => {
+                    panic!("You have been kicked because: {}", reason);
+                }
             };
         } else {
             println!("can't read message as string");

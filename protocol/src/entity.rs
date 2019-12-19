@@ -48,6 +48,14 @@ impl Entity {
         self.name = name;
     }
 
+    pub fn get_x(&self) -> SingleAxis {
+        self.coords.x
+    }
+
+    pub fn get_y(&self) -> SingleAxis {
+        self.coords.y
+    }
+
     pub fn get_name(&self) -> &String {
         &self.name
     }

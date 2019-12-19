@@ -14,6 +14,7 @@ pub enum Message {
     Tick,
     Ping,
     TpEntity{id: u64, coords: Coords},
+    Kick(String)
 }
 
 impl Message {

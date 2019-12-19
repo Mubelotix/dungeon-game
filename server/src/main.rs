@@ -22,13 +22,17 @@ use std::collections::hash_map::Entry;
 use protocol::coords::*;
 
 struct Client {
+	pub username: String,
+	pub warns_number: u16,
 	pub id: u64,
 	pub sender: Sender<OwnedMessage>,
 	pub receiver: Receiver<Message>,
-	pub loaded_chunks_top_left: (u64, u64)
+	pub loaded_chunks_top_left: (u64, u64),
+	pub loaded_entities: Vec<u64>,
 }
 
 const CENTER_POINT: u64 = 9_223_372_036_854_775_808;
+const MAX_WARNS: u16 = 5;
 
 fn log(message: impl Display) {
 	println!("\x1B[90m[{}]\x1B[0m {}", Local::now().format("%T"), message);
@@ -181,21 +185,85 @@ fn main() {
 		map[(9_223_372_036_854_775_810, 9_223_372_036_854_775_807 + y)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
 		map[(9_223_372_036_854_775_810 + 11, 9_223_372_036_854_775_807 + y)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
 	}
+	map[(9_223_372_036_854_775_890, 9_223_372_036_854_775_807)] = Block::new(BlockCode::SimpleWall, Orientation::Up);
 
 	loop {
+		let start = SystemTime::now();
+
 		while let Ok(client) = clients_rx.try_recv() {
 			let entity = Entity::spawn_player("undefined".to_string());
 			let client = Client {
+				username: String::from("[undefined username]"),
+				warns_number: 0,
 				id: entity.get_id(),
 				sender: client.0,
 				receiver: client.1,
 				loaded_chunks_top_left: (9_223_372_036_854_775_808 - 4 * 8, 9_223_372_036_854_775_808 - 2 * 8),
+				loaded_entities: Vec::new(),
 			};
 			clients.push(client);
 			entities.insert(entity.get_id(), entity);
 		}
 
 		for idx in 0..clients.len() {
+			let player = entities.get(&clients[idx].id).expect("entity should be existing");
+
+			let player_chunk_coords = (player.coords.x.main - (player.coords.x.main % 8), player.coords.y.main - (player.coords.y.main % 8));
+			let needed_chunks_top_left = (player_chunk_coords.0 - 4*8, player_chunk_coords.1 - 2*8);
+
+			for id in clients[idx].loaded_entities.iter() {
+				let entity = entities.get(id).expect("entity does not exist");
+				clients[idx].sender.send(OwnedMessage::Text(Message::TpEntity{id: *id, coords: entity.coords.clone()}.encode())).unwrap();
+			}
+			
+			/*for (id, entity) in &entities {
+				if clients[idx].loaded_entities.contains(id) {
+					clients[idx].sender.send(OwnedMessage::Text(Message::TpEntity{id: *id, coords: entity.coords.clone()}.encode())).unwrap();
+				} else if entity.get_x().main >= clients[idx].loaded_chunks_top_left.0 && entity.get_x().main < clients[idx].loaded_chunks_top_left.0 + 8*8 && entity.get_y().main > clients[idx].loaded_chunks_top_left.1 && entity.get_y().main < clients[idx].loaded_chunks_top_left.1 + 4*8 ||
+				entity.get_x().main >= needed_chunks_top_left.0 && entity.get_x().main < needed_chunks_top_left.0 + 8*8 && entity.get_y().main > needed_chunks_top_left.1 && entity.get_y().main < needed_chunks_top_left.1 + 4*8 {
+					clients[idx].sender.send(OwnedMessage::Text(Message::CreateEntity(entity.clone()).encode())).unwrap();
+				}
+			}*/
+
+			// if we must load chunks to left
+			if needed_chunks_top_left.0 < clients[idx].loaded_chunks_top_left.0 {
+				for i in 0..(clients[idx].loaded_chunks_top_left.0 - needed_chunks_top_left.0) / 8 {
+					for j in 0..4 {
+						if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(needed_chunks_top_left.0 + i * 8, clients[idx].loaded_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
+						if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: needed_chunks_top_left.0 + i * 8 + 64, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
+					}
+				}
+				clients[idx].loaded_chunks_top_left.0 = needed_chunks_top_left.0;
+			} else if needed_chunks_top_left.0 > clients[idx].loaded_chunks_top_left.0 {
+				for i in 0..(needed_chunks_top_left.0 - clients[idx].loaded_chunks_top_left.0) / 8 {
+					for j in 0..4 {
+						if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8 + 64, clients[idx].loaded_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
+						if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
+					}
+				}
+				clients[idx].loaded_chunks_top_left.0 = needed_chunks_top_left.0;
+			}
+
+			// if we must load chunks to top
+			if needed_chunks_top_left.1 < clients[idx].loaded_chunks_top_left.1 {
+				for i in 0..8 {
+					for j in 0..(clients[idx].loaded_chunks_top_left.1 - needed_chunks_top_left.1) / 8 {
+						if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8, needed_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
+						if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: needed_chunks_top_left.1 + j * 8 + 64}.encode())).is_err() { break; }
+					}
+				}
+				clients[idx].loaded_chunks_top_left.1 = needed_chunks_top_left.1;
+			} else if needed_chunks_top_left.1 > clients[idx].loaded_chunks_top_left.1 {
+				for i in 0..8 {
+					for j in 0..(needed_chunks_top_left.1 - clients[idx].loaded_chunks_top_left.1) / 8 {
+						if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8, clients[idx].loaded_chunks_top_left.1 + 64 + j * 8)).encode())).is_err() { break; }
+						if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
+					}
+				}
+				clients[idx].loaded_chunks_top_left.1 = needed_chunks_top_left.1;
+			}
+			
+
 			let player = entities.get_mut(&clients[idx].id).expect("entity should be existing");
 
 			while let Ok(message) = clients[idx].receiver.try_recv() {
@@ -203,7 +271,8 @@ fn main() {
 					Message::InitServer{username, screen_width: _, screen_height: _, password: _} => {
 						log(format!("{} has connected", username));
 						
-						player.set_entity_name(username);
+						player.set_entity_name(username.clone());
+						clients[idx].username = username;
 						if clients[idx].sender.send(OwnedMessage::Text(Message::CreateEntity(player.clone()).encode())).is_err() { break; }
 						if clients[idx].sender.send(OwnedMessage::Text(Message::InitClient{id: player.get_id()}.encode())).is_err() { break; }
 						
@@ -218,48 +287,15 @@ fn main() {
 							if !map[coords.clone().into()].is_solid() && !map[(coords.clone() + Coords::new(SingleAxis::new(1, 0), SingleAxis::new(0, 0))).into()].is_solid() && !map[(coords.clone() - Coords::new(SingleAxis::new(0, 0), SingleAxis::new(1, 0))).into()].is_solid()  && !map[(coords.clone() + Coords::new(SingleAxis::new(1, 0), SingleAxis::new(0, 0)) - Coords::new(SingleAxis::new(0, 0), SingleAxis::new(1, 0))).into()].is_solid() && player.coords.distance_from(&coords) <= player.get_speed().into() {
 								player.coords = coords;
 							} else {
+								clients[idx].warns_number += 1;
+								if clients[idx].warns_number > MAX_WARNS {
+									clients[idx].sender.send(OwnedMessage::Text(Message::Kick(String::from("You have been kicked")).encode())).unwrap();
+									log(format!("{} has been kicked", clients[idx].username));
+								}
+								
 								if clients[idx].sender.send(OwnedMessage::Text(Message::TpEntity{id: player.get_id(), coords: player.coords.clone()}.encode())).is_err() { break; };
 							}
-							let player_chunk_coords = (player.coords.x.main - (player.coords.x.main % 8), player.coords.y.main - (player.coords.y.main % 8));
-							let needed_chunks_top_left = (player_chunk_coords.0 - 4*8, player_chunk_coords.1 - 2*8);
-
-							// if we must load chunks to left
-							if needed_chunks_top_left.0 < clients[idx].loaded_chunks_top_left.0 {
-								for i in 0..(clients[idx].loaded_chunks_top_left.0 - needed_chunks_top_left.0) / 8 {
-									for j in 0..4 {
-										if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(needed_chunks_top_left.0 + i * 8, clients[idx].loaded_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
-										if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: needed_chunks_top_left.0 + i * 8 + 64, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
-									}
-								}
-								clients[idx].loaded_chunks_top_left.0 = needed_chunks_top_left.0;
-							} else if needed_chunks_top_left.0 > clients[idx].loaded_chunks_top_left.0 {
-								for i in 0..(needed_chunks_top_left.0 - clients[idx].loaded_chunks_top_left.0) / 8 {
-									for j in 0..4 {
-										if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8 + 64, clients[idx].loaded_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
-										if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
-									}
-								}
-								clients[idx].loaded_chunks_top_left.0 = needed_chunks_top_left.0;
-							}
-
-							// if we must load chunks to top
-							if needed_chunks_top_left.1 < clients[idx].loaded_chunks_top_left.1 {
-								for i in 0..8 {
-									for j in 0..(clients[idx].loaded_chunks_top_left.1 - needed_chunks_top_left.1) / 8 {
-										if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8, needed_chunks_top_left.1 + j * 8)).encode())).is_err() { break; }
-										if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: needed_chunks_top_left.1 + j * 8 + 64}.encode())).is_err() { break; }
-									}
-								}
-								clients[idx].loaded_chunks_top_left.1 = needed_chunks_top_left.1;
-							} else if needed_chunks_top_left.1 > clients[idx].loaded_chunks_top_left.1 {
-								for i in 0..8 {
-									for j in 0..(needed_chunks_top_left.1 - clients[idx].loaded_chunks_top_left.1) / 8 {
-										if clients[idx].sender.send(OwnedMessage::Text(Message::Chunk(map.get_chunk(clients[idx].loaded_chunks_top_left.0 + i * 8, clients[idx].loaded_chunks_top_left.1 + 64 + j * 8)).encode())).is_err() { break; }
-										if clients[idx].sender.send(OwnedMessage::Text(Message::UnloadChunk{x: clients[idx].loaded_chunks_top_left.0 + i * 8, y: clients[idx].loaded_chunks_top_left.1 + j * 8}.encode())).is_err() { break; }
-									}
-								}
-								clients[idx].loaded_chunks_top_left.1 = needed_chunks_top_left.1;
-							}
+							
 						} else {
 							println!("attempt to move an unowned entity");
 						}
@@ -280,6 +316,12 @@ fn main() {
 					},
 				}
 			}
+
+			let end = SystemTime::now();
+			if end.duration_since(SystemTime::UNIX_EPOCH).unwrap().as_millis() % 50 == 0 {
+				println!("{} => {} clients max", end.duration_since(start).unwrap().as_micros(), 16000/end.duration_since(start).unwrap().as_micros());
+			}
+			
 
 			if clients[idx].sender.send(OwnedMessage::Text(Message::Tick.encode())).is_err() { break; }
 		}
@@ -344,6 +386,8 @@ fn main() {
 				}
 			}
 		}
+
+		
 
 		sleep(Duration::from_millis(16));
 	}
