@@ -204,7 +204,7 @@ fn main(mut images: Vec<Image>, websocket: Rc<WebSocket>) {
 
 fn setup_websocket(images: Vec<Image>) {
     println!("Connecting...");
-    let websocket = Rc::new(WebSocket::new_with_str("ws://localhost:2794", "dungeon_game_protocol").unwrap());
+    let websocket = Rc::new(WebSocket::new_with_str("ws://localhost:51034", "dungeon_game_protocol").unwrap());
 
     // TODO clear this shit
     let websocket2 = Rc::clone(&websocket);
